@@ -7,10 +7,9 @@ function [moveIndice] = fingerMovingIndex_new( movement,Fs,fig )
     mDerv = [0; abs(diff(movement))];
 
     % parameters:
-    derv_threshold_min = 0.2;
+    derv_threshold_min = 0.3;
     derv_threshold_decision = 1;
     test_width = 500;
-    tolerance_width = 100; 
     
     new_move = 1;
     n_check = 1;
@@ -27,7 +26,7 @@ function [moveIndice] = fingerMovingIndex_new( movement,Fs,fig )
             if n-n_check > test_width
                 n_end = n_check;
                 if max(mDerv(n_start:n_end)) > derv_threshold_decision
-                    moveIndice(:,i) = [n_start-tolerance_width n_end]; 
+                    moveIndice(:,i) = [n_start n_end]; 
                     i = i+1;
                 end
                 new_move = 1;
