@@ -1,9 +1,9 @@
-function [train_data,avrC,Spfilt,lda_W,lda_B] = trainBCI( eTrain,mrk,wnd,Fs,seeplot ) 
-% (note: mrk in sparse, labels 1&2, assuming class data equal and div by 10)
+function [train_data,avrC,Spfilt,lda_W,lda_B] = trainBCI_1( eTrain,mrk,wnd,Fs,seeplot ) 
+% (note: mrk in sparse, labels 1&2)
 
     % OPTIONS:
     freqRange = [7 30]; 
-    wnd_train = [1 3]; 
+    wnd_train = [1 3]; % eg. 1-3 sec
     nof = 4; % needs validation  
 
     %% Bandpass filtering
@@ -38,8 +38,8 @@ function [train_data,avrC,Spfilt,lda_W,lda_B] = trainBCI( eTrain,mrk,wnd,Fs,seep
 %             C{k}(:,:,nclass{k}) = tmp_C./trace(tmp_C);
 %         end
 %     end
-%     avrC{1} = mean(C{1},3); % class average covariance
-%     avrC{2} = mean(C{2},3);
+%     avrC{1} = mean(C{1}(:,:,1:nclass{1}),3); % class average covariance
+%     avrC{2} = mean(C{2}(:,:,1:nclass{2}),3);
     
     wnd_test = wnd*Fs;
     train_epoc = round(Fs*wnd_train(1)):round(Fs*wnd_train(2)); 
@@ -73,24 +73,24 @@ function [train_data,avrC,Spfilt,lda_W,lda_B] = trainBCI( eTrain,mrk,wnd,Fs,seep
 %                 C{k}(:,:,i) = tmp_C./trace(tmp_C);
 %             end
 %         end
-%         avrC{k} = mean(C{k},3); % class average covariance
 %         nclass{k} = i; % # trials from class k 
+%         avrC{k} = mean(C{k}(:,:,1:nclass{k}),3); % class average covariance
 %     end
 
     %% CSP
-    [Uvec,Uval] = eig(avrC{1}+avrC{2});
-    [Uval,idxs] = sort(diag(Uval),'descend'); % sort eigenvals in descend order
-    Uvec = Uvec(:,idxs);
-    P = sqrt(inv(diag(Uval)))*Uvec'; % whitening matrix
-    s1 = P*avrC{1}*P';
-    [Rvec,Rval] = eig(s1);
-    [Rval,idxs] = sort(diag(Rval),'descend'); 
-    R = Rvec(:,idxs);
-    W = R'*P;
-    Spfilt = W([1:nof end-nof+1:end],:)';   
+%     [Uvec,Uval] = eig(avrC{1}+avrC{2});
+%     [Uval,idxs] = sort(diag(Uval),'descend'); % sort eigenvals in descend order
+%     Uvec = Uvec(:,idxs);
+%     P = sqrt(inv(diag(Uval)))*Uvec'; % whitening matrix
+%     s1 = P*avrC{1}*P';
+%     [Rvec,Rval] = eig(s1);
+%     [Rval,idxs] = sort(diag(Rval),'descend'); 
+%     R = Rvec(:,idxs);
+%     W = R'*P;
+%     Spfilt = W([1:nof end-nof+1:end],:)';   
     
-%     [V,D] = eig(avrC{1},avrC{1}+avrC{2});
-%     Spfilt = V(:,[1:nof end-nof+1:end]);  
+    [V,D] = eig(avrC{1},avrC{1}+avrC{2});
+    Spfilt = V(:,[1:nof end-nof+1:end]);  
     
     %% Log-variance feature extraction
     for k = 1:2
