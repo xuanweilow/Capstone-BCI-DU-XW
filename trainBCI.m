@@ -155,78 +155,81 @@ cv_size = 5;
 CHUNK = [1 5];
 PARAM_A = [0 2^-8 2^-7 2^-6 2^-5 2^-4 2^-3 2^-2 2^-1 1];
 error_data = zeros(numel(CHUNK),numel(PARAM_A));
-for fold = 1:nclass{1}/cv_size
-    clear tmp_trainC tmp_avrC
-    for k = 1:2
-        test_trials{k} = (fold-1)*cv_size+[1:cv_size]; 
-        train_trials{k} = [1:(test_trials{k}(1)-1) (test_trials{k}(end)+1):nclass{k}];
-        tmp_trainC{k} = C{k}(:,:,train_trials{k});
-        tmp_avrC{k} = mean(tmp_trainC{k},3); % class average covariance
-    end
-       
-    for i = 1:numel(CHUNK)
-        clear tmp_chunkavrC
+for fold1 = 1:nclass{1}/cv_size
+    for fold2 = 1:nclass{2}/cv_size
+        clear tmp_trainC tmp_avrC
+        test_trials{1} = (fold1-1)*cv_size+[1:cv_size];
+        test_trials{2} = (fold2-1)*cv_size+[1:cv_size];
         for k = 1:2
-            tmp_chunkC = [];
-            for c = 1:size(tmp_trainC{k},3)/CHUNK(i)
-                interval =(c-1)*CHUNK(i)+[1:CHUNK(i)];
-                tmp_chunkC(:,:,c) = mean(tmp_trainC{k}(:,:,interval),3);
-                tmp_chunkC(:,:,c) = tmp_chunkC(:,:,c)-tmp_avrC{k};
-                [tmp_vec,tmp_val] = eig(tmp_chunkC(:,:,c));
-                tmp_chunkC(:,:,c) = tmp_vec*abs(tmp_val)/tmp_vec; % positise its eig value
-                tmp_chunkC(:,:,c) = tmp_chunkC(:,:,c)./trace(tmp_chunkC(:,:,c)); % normalise
-            end
-            tmp_chunkavrC{k} = mean(tmp_chunkC,3); % class average covariance
+            train_trials{k} = [1:(test_trials{k}(1)-1) (test_trials{k}(end)+1):nclass{k}];
+            tmp_trainC{k} = C{k}(:,:,train_trials{k});
+            tmp_avrC{k} = mean(tmp_trainC{k},3); % class average covariance
         end
-        tmp_penaltyC = (tmp_chunkavrC{1}+tmp_chunkavrC{2}); % penalty term
         
-        for j = 1:numel(PARAM_A)
-            [V1,D1] = eig(tmp_avrC{1},tmp_avrC{1}+tmp_avrC{2}+PARAM_A(j)*tmp_penaltyC);
-            [V2,D2] = eig(tmp_avrC{2},tmp_avrC{1}+tmp_avrC{2}+PARAM_A(j)*tmp_penaltyC);           
-            [~,idxs] = sort(diag(D1),'descend');
-            V1 = V1(:,idxs);
-            [~,idxs] = sort(diag(D2),'ascend');
-            V2 = V2(:,idxs);
-            tmp_Spfilt = [V1(:,1:nof) V2(:,end-nof+1:end)];
-            
-            % Log-variance feature extraction
-            clear features outputs
+        for i = 1:numel(CHUNK)
+            clear tmp_chunkavrC
             for k = 1:2
-                features{k} = [];
-                for trial = train_trials{k}
-                    for section = 1:length(train_epocAdj)/wnd_test
-                        interval = (section-1)*wnd_test+[1:wnd_test];
-                        features{k} = vertcat(features{k},log(var(train_data{k,trial}(interval,:)*tmp_Spfilt)));
+                tmp_chunkC = [];
+                for c = 1:size(tmp_trainC{k},3)/CHUNK(i)
+                    interval =(c-1)*CHUNK(i)+[1:CHUNK(i)];
+                    tmp_chunkC(:,:,c) = mean(tmp_trainC{k}(:,:,interval),3);
+                    tmp_chunkC(:,:,c) = tmp_chunkC(:,:,c)-tmp_avrC{k};
+                    [tmp_vec,tmp_val] = eig(tmp_chunkC(:,:,c));
+                    tmp_chunkC(:,:,c) = tmp_vec*abs(tmp_val)/tmp_vec; % positise its eig value
+                    tmp_chunkC(:,:,c) = tmp_chunkC(:,:,c)./trace(tmp_chunkC(:,:,c)); % normalise
+                end
+                tmp_chunkavrC{k} = mean(tmp_chunkC,3); % class average covariance
+            end
+            tmp_penaltyC = (tmp_chunkavrC{1}+tmp_chunkavrC{2}); % penalty term
+            
+            for j = 1:numel(PARAM_A)
+                [V1,D1] = eig(tmp_avrC{1},tmp_avrC{1}+tmp_avrC{2}+PARAM_A(j)*tmp_penaltyC);
+                [V2,D2] = eig(tmp_avrC{2},tmp_avrC{1}+tmp_avrC{2}+PARAM_A(j)*tmp_penaltyC);
+                [~,idxs] = sort(diag(D1),'descend');
+                V1 = V1(:,idxs);
+                [~,idxs] = sort(diag(D2),'ascend');
+                V2 = V2(:,idxs);
+                tmp_Spfilt = [V1(:,1:nof) V2(:,end-nof+1:end)];
+                
+                % Log-variance feature extraction
+                clear features outputs
+                for k = 1:2
+                    features{k} = [];
+                    for trial = train_trials{k}
+                        for section = 1:length(train_epocAdj)/wnd_test
+                            interval = (section-1)*wnd_test+[1:wnd_test];
+                            features{k} = vertcat(features{k},log(var(train_data{k,trial}(interval,:)*tmp_Spfilt)));
+                        end
                     end
                 end
-            end
-            
-            % LDA Classification
-            lda_W = ((mean(features{2})-mean(features{1}))/(cov(features{1})+cov(features{2})))';
-            lda_B = (mean(features{1})+mean(features{2}))*lda_W/2; 
-            temp_error = 0;
-            n_test = 0;
-            for k = 1:2
-                outputs{k} = [];
-                for trial = test_trials{k}
-                    for section = 1:length(train_epocAdj)/wnd_test 
-                        interval = (section-1)*wnd_test+[1:wnd_test]; 
-                        temp_output = log(var(train_data{k,trial}(interval,:)*tmp_Spfilt))*lda_W - lda_B;
-                        outputs{k} = vertcat(outputs{k},temp_output);
-                        temp_error = temp_error +(sign(temp_output)~=k*2-3);
-                        n_test = n_test+1;
+                
+                % LDA Classification
+                lda_W = ((mean(features{2})-mean(features{1}))/(cov(features{1})+cov(features{2})))';
+                lda_B = (mean(features{1})+mean(features{2}))*lda_W/2;
+                temp_error = 0;
+                n_test = 0;
+                for k = 1:2
+                    outputs{k} = [];
+                    for trial = test_trials{k}
+                        for section = 1:length(train_epocAdj)/wnd_test
+                            interval = (section-1)*wnd_test+[1:wnd_test];
+                            temp_output = log(var(train_data{k,trial}(interval,:)*tmp_Spfilt))*lda_W - lda_B;
+                            outputs{k} = vertcat(outputs{k},temp_output);
+                            temp_error = temp_error +(sign(temp_output)~=k*2-3);
+                            n_test = n_test+1;
+                        end
                     end
                 end
+                error_data(i,j) = error_data(i,j) +temp_error/n_test;
+                fishscore(i,j) = (mean(outputs{1})-mean(outputs{2}))^2/(var(outputs{1}+var(outputs{2})));
+                
             end
-            error_data(i,j) = error_data(i,j) +temp_error/n_test;
-            fishscore(i,j) = (mean(outputs{1})-mean(outputs{2}))^2/(var(outputs{1}+var(outputs{2})));
-            
         end
     end
 end
-error_data = error_data./fold;
+error_data = error_data./(fold1*fold2);
 % Determine the best parameters
-[i,j] = find(error_data==min(min(error_data)));
+[i,j] = find(error_data==min(error_data(:)));
 idx_i = i(1); idx_j = j(1);
 for n = 1:numel(i)
     if fishscore(i(n),j(n)) > fishscore(idx_i,idx_j)
