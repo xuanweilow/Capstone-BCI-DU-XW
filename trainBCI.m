@@ -279,7 +279,7 @@ for k = 1:2
     end
 end
 
-% LDA Classification
+%% LDA Classification
 covr = cov(features{1})+cov(features{2});
 mean_diff = mean(features{2})-mean(features{1}); covr = covr + mean_diff'*mean_diff./4; 
 lda_W = ((mean(features{2})-mean(features{1}))/covr)';
