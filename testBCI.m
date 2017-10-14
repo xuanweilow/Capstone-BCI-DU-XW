@@ -1,9 +1,9 @@
-function [output,features,means_k] = testBCI(data,Fs,freqRange,Spfilt,lda_W,means_k,paramU) 
+function [output,features,means_k] = testBCI(data,Frfilt,Spfilt,lda_W,means_k,paramU) 
 
     % Spatial filtered
     data_filt = data*Spfilt;
     % Bandpass filtered
-    data_filt = bpfilt(data_filt,Fs,freqRange(1),freqRange(2));
+    data_filt = bpfilt(data_filt,Frfilt);
     features = log(var(data_filt));
     
     % Update LDA's bias on each trial
