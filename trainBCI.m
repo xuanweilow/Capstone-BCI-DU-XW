@@ -1,4 +1,4 @@
-function [Spfilt,lda_W,lda_B,means_k,train_timerange] = trainBCI( eTrain,lblTrain,wnd_test,Fs,fig )
+function [Frfilt,Spfilt,lda_W,lda_B,means_k,train_timerange] = trainBCI( eTrain,lblTrain,wnd_test,Fs,fig )
 % ( note: lblTrain must be {0,1,2}, 
 %         assume there are equal trials of cue class & are divisible by 5 )
 
@@ -8,6 +8,12 @@ nof = 4; % number of CSP filter pairs
 left_chn = [1 3 4 7]; % left hemisphere channel indexes
 right_chn = [2 5 6 8]; % right hemisphere channel indexes
 
+
+%% Filter design
+Frfilt = designfilt('bandpassiir','FilterOrder',30,...
+         'HalfPowerFrequency1',freqRange(1),'HalfPowerFrequency2',freqRange(2),...
+         'DesignMethod','butter','SampleRate',Fs);
+%     fvtool(Frfilt); to analyse filter
 
 %% Configure for start and length of trials
 mrk = [];
@@ -45,7 +51,10 @@ for chn = 1:size(eTrain,2) % channel number
     psd_chn = [];
     for k = 1:2
         for trial = 1:nclass{k}
-            [tmp_psd,~] = pwelch(train_data_CAR{k,trial}(:,chn),[],[],freq,Fs); % PSD
+            clear tmp_psd
+            for f = 1:length(freq)
+                tmp_psd(f) = bandpower(train_data_CAR{k,trial}(:,chn),Fs,[freq(f)-1 freq(f)+1]);
+            end
             psd_chn = vertcat(psd_chn, [(tmp_psd) k]);
         end
     end
@@ -66,7 +75,7 @@ if fig == 1 %(Analysis: Spectra curve compare)
         hold on
         plot(freq,mean(psd_data{best_chn(c)}(1:nclass{1},1:end-1),1),'b');
         plot(freq,mean(psd_data{best_chn(c)}(nclass{1}+1:end,1:end-1),1),'r');
-        xlabel('Frequency (Hz)'); ylabel('PSD');
+        xlabel('Frequency (Hz)'); ylabel('Band-power');
         legend('class 1','class 2');
     end
 end
@@ -76,7 +85,7 @@ for c = 1:2
     trial_data = [];
     for k = 1:2
         for trial = 1:nclass{k}
-            tmp_data = bpfilt(train_data_CAR{k,trial}(:,best_chn(c)),Fs,freqRange(1),freqRange(2)); % bandpass filter
+            tmp_data = bpfilt(train_data_CAR{k,trial}(:,best_chn(c)),Frfilt); % bandpass filter
             env = envelope(tmp_data,Fs/5,'rms'); % envelope transform
             trial_data = vertcat(trial_data, [env' k]);
         end
@@ -135,7 +144,7 @@ end
 %% Bandpass filtering & Epoching discriminative time interval
 for k = 1:2
     for trial = 1:nclass{k}
-        tmp_data = bpfilt(train_data{k,trial},Fs,freqRange(1),freqRange(2)); % bandpass filter
+        tmp_data = bpfilt(train_data{k,trial},Frfilt); % bandpass filter
         train_data{k,trial} = tmp_data(train_epocAdj,:); % epoching
     end
 end
