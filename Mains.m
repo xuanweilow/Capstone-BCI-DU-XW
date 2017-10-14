@@ -3,20 +3,20 @@
 % mrk_train tags the class label at the start of each trial 
 Fs = 250;
 wnd_test = 0.5*Fs; % classification length (sec *Fs)
-[Spfilt,lda_W,lda_B0,means_k,train_epocAdj] = trainBCI(eTrain,lblTrain,wnd_test,Fs,1);
+[Frfilt,Spfilt,lda_W,lda_B0,means_k,train_epocAdj] = trainBCI(eTrain,lblTrain,wnd_test,Fs,1);
 
 %% Online Testing:
 % out = []; 
 % lblTest is the current class label
 % OPTION:
-paramU = 0;
+paramU = 0; % LDA udpate parameter
 % assumes that 'eTest' is in chunk of 'wnd' length
 features_tst{1} = []; features_tst{2} = []; % store features for later analysis
-if lblTest ~= 0 % current class label
-    [out,fea,means_k] = testBCI(eTest,Fs,Spfilt,lda_W,means_k,paramU);
+if lblTest ~= 0 % cued intervals can be used to update LDA parameter
+    [out,fea,means_k] = testBCI(eTest,Frfilt,Spfilt,lda_W,means_k,paramU);
     features_tst{lblTest} = vertcat(features_tst{lblTest},fea);
-else 
-    [out,~,~] = testBCI_1(eTest,Fs,Spfilt,lda_W,means_k,paramU);
+else % during rest 
+    [out,~,~] = testBCI(eTest,Frfilt,Spfilt,lda_W,means_k,paramU);
 end
 
 %% (Analysis: test classification output visualise)
